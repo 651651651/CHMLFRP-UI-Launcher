@@ -3011,28 +3011,25 @@ class MainWindow(QMainWindow):
                     item.widget().setSelected(False)
 
     def load_tunnels(self):
-        """加载隧道列表"""
+        """加载隧道列表并更新 UI"""
+        if not self.token:
+            self.show_error_message("未登录，无法加载隧道列表")
+            return
+
         try:
-            if not self.token:
-                self.show_error_message("未登录，无法加载隧道列表")
-                return
-
+            # 获取隧道列表
             tunnels = get_user_tunnels(self.token)
-            if tunnels is None:
+            if not tunnels:
+                self.logger.info("当前没有隧道哦！快点去创建吧！")
                 return
 
-            # 清除现有的隧道卡片
-            while self.tunnel_container.layout().count():
-                item = self.tunnel_container.layout().takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
+            # 清空现有的隧道卡片
+            self.clear_layout(self.tunnel_container.layout())
 
-            if not tunnels:  # 如果隧道列表为空
-                self.logger.info("当前没有隧道哦！快点去创建吧！")
-                return  # 直接返回，不显示错误
-
+            # 获取已选中的隧道 ID
             selected_ids = [t['id'] for t in self.selected_tunnels]
 
+            # 动态添加隧道卡片
             row, col = 0, 0
             for tunnel in tunnels:
                 try:
@@ -3040,29 +3037,29 @@ class MainWindow(QMainWindow):
                     tunnel_widget.clicked.connect(self.on_tunnel_clicked)
                     tunnel_widget.start_stop_signal.connect(self.start_stop_tunnel)
 
+                    # 设置选中状态
                     if tunnel['id'] in selected_ids:
                         tunnel_widget.is_selected = True
                         tunnel_widget.setSelected(True)
 
+                    # 添加到布局
                     self.tunnel_container.layout().addWidget(tunnel_widget, row, col)
-
                     col += 1
                     if col == 2:  # 每行两个卡片
                         col = 0
                         row += 1
 
-                except Exception as content:
-                    self.logger.error(f"创建隧道卡片时发生错误: {str(content)}")
-                    self.logger.error(traceback.format_exc())
+                except Exception as e:
+                    self.logger.error(f"创建隧道卡片时发生错误: {str(e)}")
                     continue
 
+            # 更新选中隧道列表
             self.selected_tunnels = [t for t in tunnels if t['id'] in selected_ids]
             self.update_tunnel_buttons()
 
-        except Exception as content:
-            self.logger.error(f"加载隧道列表时发生错误: {str(content)}")
-            self.logger.error(traceback.format_exc())
-            self.show_error_message(f"加载隧道列表时发生错误: {str(content)}")
+        except Exception as e:
+            self.logger.error(f"加载隧道列表时发生错误: {str(e)}")
+            self.show_error_message(f"加载隧道列表时发生错误: {str(e)}")
 
     @staticmethod
     def clear_error_message(widget):
@@ -3492,7 +3489,7 @@ CPU使用率: {node_info.get('cpu_usage', 'N/A')}%
             self.logger.error(f"清除用户数据时发生错误: {str(content)}")
 
     def clear_layout(self, layout):
-        """清除布局中的所有项目"""
+        """清空布局中的所有控件"""
         if layout is not None:
             while layout.count():
                 item = layout.takeAt(0)
